@@ -2,19 +2,124 @@
 
 
 ## Loading and preprocessing the data
+1.First, we will unzip `activity.zip` and load the corresponding csv data into a variable named `activity`.
 
+```{r loading, echo=TRUE}
+unzip("activity.zip")
+activity <- read.csv("activity.csv", as.is=T)
+head(activity)
+```
 
+2.After data is loaded, the date characters are transformed to POSIXct objects. 
+```{r dateTransformation, echo=TRUE}
+activity$date <- as.POSIXct(activity$date)
+head(activity$date)
+tail(activity$date)
+```
 
 ## What is mean total number of steps taken per day?
 
+Before calculation, the data frame needs to be aggregated based on date. In other words, steps for each date are added with missing values ignord.
+```{r aggregation, echo=TRUE}
+aggregatedActivity <- aggregate(steps ~ date, data=activity, FUN=sum)
+head(aggregatedActivity)
+```
 
+1.Histogram of the total number of steps taken each day...
+```{r histogram, echo=TRUE}
+hist(aggregatedActivity$steps, breaks=10, xlab='the total number of steps taken each day')
+```
+
+2.Calculate and report the mean and median total number of steps taken per day
+```{r meanTNSTPD, echo=TRUE}
+mean <- mean(aggregatedActivity$steps)
+median <- median(aggregatedActivity$steps)
+mean
+median
+```
 
 ## What is the average daily activity pattern?
+Before calculation, the data frame needs to be aggregated based on time interval. In other words, steps for each intervel are added and averaged with missing values ignord. 
 
+```{r aggregationMean, echo=TRUE}
+aggregatedActivityMean <- aggregate(steps ~ interval, data=activity, FUN="mean")
+head(aggregatedActivityMean)
+```
 
+1.Time series plot...
+```{r time series plot, echo=TRUE}
+plot(aggregatedActivityMean$interval, aggregatedActivityMean$steps,type="l", xlab = "Interval", ylab = "the average number of steps taken", main="time series plot")
+```
+
+2.Finding the maximum. The value shown below is the interval having the maximum averaged steps. In other words, interval ``835`` has the greatest averaged steps.
+
+```{r maximum, echo=TRUE}
+index <- which.max(aggregatedActivityMean$steps)
+aggregatedActivityMean$interval[index]
+```
 
 ## Imputing missing values
+1.Calculate the total number of missing values in the dataset.
+```{r countNA, echo=TRUE}
+length(which(is.na(activity$steps)))
+```
+2.I have chosen to use the mean for that 5-minute interval to replace all the na.values.
 
+3.New data set with all the missing data filled in is called `newActivity`.
+```{r newActivity, echo=TRUE}
+newActivity<-activity
+for (i in 1:length(newActivity$steps)) {
+  if (is.na(newActivity[i,1])) {
+    newActivity[i,1] <- aggregatedActivityMean[aggregatedActivityMean$interval == newActivity[i,3],2]
+    }
+  }
+```
+Double check by counting NA's in `newActivity`...
+```{r countNA2, echo=TRUE}
+length(which(is.na(newActivity$steps)))
+```
 
+4.Histogram, mean and median.
 
+Before calculation, the data frame needs to be aggregated based on date. In other words, steps for each date are added with missing values ignord.
+```{r aggregation2, echo=TRUE}
+newAggregatedActivity <- aggregate(steps ~ date, data=newActivity, FUN=sum)
+head(newAggregatedActivity)
+```
+
+4a.Histogram of the total number of steps taken each day...
+```{r histogram2, echo=TRUE}
+hist(newAggregatedActivity$steps, breaks=10, xlab='the total number of steps taken each day w/o NA', main ="Histogram w/o NA")
+```
+
+4b.Calculate and report the mean and median total number of steps taken per day
+```{r meanTNSTPD2, echo=TRUE}
+mean <- mean(newAggregatedActivity$steps)
+median <- median(newAggregatedActivity$steps)
+mean
+median
+```
+
+By observation, the mean and median do not differ very much from the estimated (diff < 1). By imputting missing data, the average would be the sum over the total number which would be same for every day. So it is a more accurate estimation of the true mean and median.
 ## Are there differences in activity patterns between weekdays and weekends?
+1.First create the factor variable...
+```{r weekdays, echo=TRUE}
+wtf <- weekdays(newActivity$date) %in% c('Sunday', 'Saturday')
+newActivity$weekday <- c("Weekday")
+newActivity$weekday[wtf] <- c("Weekend")
+newActivity$weekday <- factor(newActivity$weekday)
+table(newActivity$weekday)
+```
+2.Then draw the time series plot based on Weekdays and Weekends.
+```{r timeseriesplot for weekdays / weekend, echo=TRUE}
+newActivitySplit <- split(newActivity,newActivity$weekday)
+aggregatedActivityMeanWeekday <- aggregate(steps ~ interval, data=newActivitySplit$Weekday, FUN="mean")
+aggregatedActivityMeanWeekday$weekday <- c('Weekday')
+aggregatedActivityMeanWeekend <- aggregate(steps ~ interval, data=newActivitySplit$Weekend, FUN="mean")
+aggregatedActivityMeanWeekend$weekday <- c('Weekend')
+aggregatedActivityMeanNew <- rbind(aggregatedActivityMeanWeekend,aggregatedActivityMeanWeekday)
+library(lattice)
+xyplot(steps ~ interval | weekday, data = aggregatedActivityMeanNew, type="l", layout=c(1,2))
+
+```
+Apparently, there's a difference in Weekend and Weekday behaviors. 
